@@ -9,6 +9,31 @@ type User = {
     address: string;
 }
 
+type Payment = {
+    participants: {
+        address: string;
+        amount: number;
+        /**
+         * 0 - Отменен
+         * 1 - Успешно закрыт
+         * 2 - В процессе
+         */
+        status: '0' | '1' | '2';
+    }[];
+    description: string;
+    overallCost: number;
+    /**
+     * 0 - Отменен
+     * 1 - Успешно закрыт
+     * 2 - В процессе
+     */
+    status: '0' | '1' | '2';
+};
+
+type PaymentList = {
+    list: Payment[];
+};
+
 const userCollention = db.collection('users');
 
 const getUserAddress = async (username: string): Promise<User | undefined> => {
@@ -36,4 +61,19 @@ const getUserAddress = async (username: string): Promise<User | undefined> => {
     return response;
 }
 
-export { getUserAddress };
+const getUserPayments = async (username: string): Promise<PaymentList> => {
+    const userPayments = userCollention.doc(`${username}/payments`);
+    const userPaymentsSnapshot = await userPayments.get();
+    if (userPaymentsSnapshot.exists) {
+        // const data = userPaymentsSnapshot.data();
+        return {
+            list: []
+        };
+    } else {
+        return {
+            list: []
+        };
+    }
+}
+
+export { getUserAddress, getUserPayments };
