@@ -2,6 +2,7 @@ import axios from 'axios';
 import { createHash } from 'crypto';
 import { v4 } from 'uuid';
 import endpoint from './endpoints';
+import { VtbAPI } from './vtb'
 import { PaymentView } from './PaymentView';
 import { db } from './db';
 
@@ -84,8 +85,33 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
         const userPayments = userDocument.collection('payments');
         const userPaymentsSnapshot = await userPayments.get();
         if (!userPaymentsSnapshot.empty) {
-            const payments = await Promise.all(userPaymentsSnapshot.docs.map(payment => payment.data()));
-            return PaymentView.renderList(payments as PaymentModel[]);
+            const updateInvoiceStatus = async (participant: Payer, sessionId: string) => {
+                const axiosConfig = { headers: { FPSID: sessionId } };
+                if (participant.status === '2') {
+                    const invoiceData: VtbAPI.InvoiceInfo = await axios.get(
+                        endpoint.invoceInfo(participant.invoiceNumber, participant.address), 
+                        axiosConfig
+                    );
+                    if (invoiceData.state === 5) {
+                        participant.status = '1';
+                    } else if (invoiceData.state === 1 || invoiceData.state === 2) {
+                        participant.status = '2';
+                    } else {
+                        participant.status = '0';
+                    }
+                }
+            }
+
+            const payments: PaymentModel[] = 
+                await Promise.all(userPaymentsSnapshot.docs.map((payment: any) => payment.data()));
+            const sessionId: string = (await axios.post(endpoint.session, { deviceId })).data.data;
+            for (let index = 0; index < payments.length; index++) {
+                const payment = payments[index];
+                await Promise.all(payment.participants.map(
+                    user => updateInvoiceStatus(user, sessionId)
+                ));
+            }
+            return PaymentView.renderList(payments);
         }
     }
     return {
