@@ -1,6 +1,7 @@
 import axios from 'axios';
 import { createHash } from 'crypto';
 import endpoint from './endpoints';
+import { PaymentView } from './PaymentView';
 import { db } from './db';
 
 const deviceId = 'metadevs';
@@ -9,7 +10,8 @@ type User = {
     address: string;
 }
 
-type Payment = {
+export type PaymentModel = {
+    id: string;
     participants: {
         address: string;
         amount: number;
@@ -19,8 +21,29 @@ type Payment = {
          * 2 - В процессе
          */
         status: '0' | '1' | '2';
+        invoiceNumber: string;
     }[];
     description: string;
+    ownerAmount: number;
+    overallCost: number;
+};
+
+
+export type Payment = {
+    id: string;
+    participants: {
+        address: string;
+        amount: number;
+        /**
+         * 0 - Отменен
+         * 1 - Успешно закрыт
+         * 2 - В процессе
+         */
+        status: '0' | '1' | '2';
+        invoiceNumber: string;
+    }[];
+    description: string;
+    ownerAmount: number;
     overallCost: number;
     /**
      * 0 - Отменен
@@ -65,10 +88,8 @@ const getUserPayments = async (username: string): Promise<PaymentList> => {
     const userPayments = userCollention.doc(`${username}/payments`);
     const userPaymentsSnapshot = await userPayments.get();
     if (userPaymentsSnapshot.exists) {
-        // const data = userPaymentsSnapshot.data();
-        return {
-            list: []
-        };
+        const payments: PaymentModel[] = userPaymentsSnapshot.data();
+        return PaymentView.renderList(payments);
     } else {
         return {
             list: []
