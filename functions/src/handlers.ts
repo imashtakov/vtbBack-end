@@ -119,17 +119,18 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
     };
 }
 
-
-
 const createPayment = async ({ username, payment }: { username: string, payment: Payment }): Promise<void> => {
-    const userPayments = userCollention.doc(`${username}/payments`);
-    payment.participants.map((payer: Payer) => {
-        return {
-            ...payer,
-            invoiceNumber: v4()
-        }
-    });
-    await userPayments.create(payment);
+    const userDocument = userCollention.doc(`${username}`);
+    const userDocumentSnapshot = await userDocument.get();
+    if (userDocumentSnapshot.exists) {
+        const userPayments = userDocument.collection('payments');
+        userPayments.add(payment.participants.map((payer: Payer) => {
+            return {
+                ...payer,
+                invoiceNumber: v4()
+            }
+        }));
+    }
 }
 
 export { getUserAddress, getUserPayments, createPayment };
