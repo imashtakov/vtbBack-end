@@ -5,7 +5,7 @@ import { createHash } from 'crypto';
 const deviceId = 'metadevs';
 
 type User = {
-    address: string;
+    user: string;
 }
 
 const getUserAddress = async (username: string): Promise<User> => {
@@ -14,7 +14,7 @@ const getUserAddress = async (username: string): Promise<User> => {
     axiosConfig.headers.FPSID = sessionData.data;
     const identifier = createHash('sha256').update(Buffer.from(username)).digest('hex');
     const { data: userData } = await axios.get(endpoint.identifier(identifier), axiosConfig);
-    return userData.data.address;
+    return { user: userData.data.address };
 }
 
 export { getUserAddress };
