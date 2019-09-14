@@ -7,6 +7,7 @@ export type User = {
 }
 
 export type Payment = {
+  id: string;
   participants: {
       address: string;
       amount: number;
@@ -16,8 +17,10 @@ export type Payment = {
        * 2 - В процессе
        */
       status: '0' | '1' | '2';
+      invoiceNumber: string;
   }[];
   description: string;
+  ownerAmount: number;
   overallCost: number;
   /**
    * 0 - Отменен

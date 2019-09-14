@@ -4,4 +4,6 @@ const session = `${BASE_URL}/session`;
 
 const identifier = (identifier: string) => `${BASE_URL}/account/identifier/${identifier}`;
 
-export default { session, identifier };
+const invoceInfo = (invoiceNumber: string, address: string) => `${BASE_URL}/invoice/810/${invoiceNumber}/${address}`;
+
+export default { session, identifier, invoceInfo };
