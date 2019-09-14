@@ -22,7 +22,7 @@
         firebase.initializeApp(firebaseConfig);
 
 
-        const addMessage = firebase.functions().httpsCallable('getUserAddress');
+        const addMessage = firebase.functions().httpsCallable('getUserPayments');
         addMessage('deziev').then(
             function (result) {
                 console.warn(result);

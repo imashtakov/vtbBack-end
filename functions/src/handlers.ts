@@ -1,5 +1,6 @@
 import axios from 'axios';
 import { createHash } from 'crypto';
+import { v4 } from 'uuid';
 import endpoint from './endpoints';
 import { PaymentView } from './PaymentView';
 import { db } from './db';
@@ -10,19 +11,21 @@ type User = {
     address: string;
 }
 
+type Payer = {
+    address: string;
+    amount: number;
+    /**
+     * 0 - Отменен
+     * 1 - Успешно закрыт
+     * 2 - В процессе
+     */
+    status: '0' | '1' | '2';
+    invoiceNumber: string;
+}
+
 export type PaymentModel = {
     id: string;
-    participants: {
-        address: string;
-        amount: number;
-        /**
-         * 0 - Отменен
-         * 1 - Успешно закрыт
-         * 2 - В процессе
-         */
-        status: '0' | '1' | '2';
-        invoiceNumber: string;
-    }[];
+    participants: Payer[];
     description: string;
     ownerAmount: number;
     overallCost: number;
@@ -31,17 +34,7 @@ export type PaymentModel = {
 
 export type Payment = {
     id: string;
-    participants: {
-        address: string;
-        amount: number;
-        /**
-         * 0 - Отменен
-         * 1 - Успешно закрыт
-         * 2 - В процессе
-         */
-        status: '0' | '1' | '2';
-        invoiceNumber: string;
-    }[];
+    participants: Payer[];
     description: string;
     ownerAmount: number;
     overallCost: number;
@@ -84,17 +77,33 @@ const getUserAddress = async (username: string): Promise<User | undefined> => {
     return response;
 }
 
-const getUserPayments = async (username: string): Promise<PaymentList> => {
-    const userPayments = userCollention.doc(`${username}/payments`);
-    const userPaymentsSnapshot = await userPayments.get();
-    if (userPaymentsSnapshot.exists) {
-        const payments: PaymentModel[] = userPaymentsSnapshot.data();
-        return PaymentView.renderList(payments);
-    } else {
-        return {
-            list: []
-        };
+const getUserPayments = async (username: string): Promise<PaymentList | undefined> => {
+    const userDocument = userCollention.doc(`${username}`);
+    const userDocumentSnapshot = await userDocument.get();
+    if (userDocumentSnapshot.exists) {
+        const userPayments = userDocument.collection('payments');
+        const userPaymentsSnapshot = await userPayments.get();
+        if (!userPaymentsSnapshot.empty) {
+            const payments = await Promise.all(userPaymentsSnapshot.docs.map(payment => payment.data()));
+            return PaymentView.renderList(payments as PaymentModel[]);
+        }
     }
+    return {
+        list: []
+    };
 }
 
-export { getUserAddress, getUserPayments };
+
+
+const createPayment = async ({ username, payment }: { username: string, payment: Payment }): Promise<void> => {
+    const userPayments = userCollention.doc(`${username}/payments`);
+    payment.participants.map((payer: Payer) => {
+        return {
+            ...payer,
+            invoiceNumber: v4()
+        }
+    });
+    await userPayments.create(payment);
+}
+
+export { getUserAddress, getUserPayments, createPayment };
