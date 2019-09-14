@@ -89,7 +89,7 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
                 const axiosConfig = { headers: { FPSID: sessionId } };
                 if (participant.status === '2') {
                     const invoiceData: VtbAPI.InvoiceInfo = await axios.get(
-                        endpoint.invoceInfo(participant.invoiceNumber, participant.address), 
+                        endpoint.invoceInfo(participant.invoiceNumber, participant.address),
                         axiosConfig
                     );
                     if (invoiceData.state === 5) {
@@ -102,7 +102,7 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
                 }
             }
 
-            const payments: PaymentModel[] = 
+            const payments: PaymentModel[] =
                 await Promise.all(userPaymentsSnapshot.docs.map((payment: any) => payment.data()));
             const sessionId: string = (await axios.post(endpoint.session, { deviceId })).data.data;
             for (let index = 0; index < payments.length; index++) {
@@ -123,13 +123,30 @@ const createPayment = async ({ username, payment }: { username: string, payment:
     const userDocument = userCollention.doc(`${username}`);
     const userDocumentSnapshot = await userDocument.get();
     if (userDocumentSnapshot.exists) {
+        const { data: sessionData } = await axios.post(endpoint.session, { deviceId });
+        const axiosConfig = { headers: { FPSID: null } };
+        axiosConfig.headers.FPSID = sessionData.data;
+        const userData = userDocumentSnapshot.data();
         const userPayments = userDocument.collection('payments');
-        userPayments.add(payment.participants.map((payer: Payer) => {
+        payment.participants = payment.participants.map((payer: Payer) => {
             return {
                 ...payer,
+                status: '2',
                 invoiceNumber: v4()
             }
-        }));
+        });
+        await userPayments.add(payment);
+        payment.participants.forEach(async payer => {
+            const vtbInvoice = {
+                amount: payer.amount,
+                currencyCode: 810,
+                description: payment.description,
+                payer: payer.address,
+                recipient: userData!.address,
+                number: payer.invoiceNumber
+            }
+            await axios.post(endpoint.invoice, vtbInvoice, axiosConfig)
+        });
     }
 }
 

@@ -21,12 +21,27 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
 
+        const paymentPayload = {
+            username: 'deziev',
+            payment: {
+                participants: [{
+                    address: '2c80ef1c177c7308e8c9797fee1a5688c308cb6f',
+                    amount: 2000
+                }, {
+                    address: 'b92f0a8b44bca0e1025d38b1bd7aa246185e3352',
+                    amount: 500
+                }],
+                description: '123',
+                ownerAmount: 5000,
+                overallCost: 10000
+            }
+        }
+
+        const addPayment = firebase.functions().httpsCallable('createPayment');
+        addPayment(paymentPayload).then(result => console.warn(result));
 
         const addMessage = firebase.functions().httpsCallable('getUserPayments');
-        addMessage('deziev').then(
-            function (result) {
-                console.warn(result);
-            });
+        addMessage('deziev').then(result => console.warn(result));
     </script>
 </body>
 

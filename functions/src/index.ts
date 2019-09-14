@@ -10,6 +10,5 @@ export const helloWorld = functions.https.onRequest((request, response) => {
 });
 
 export const getUserAddress = functions.https.onCall(getUserAddressHandler);
-
 export const getUserPayments = functions.https.onCall(getUserPaymentsHandler);
 export const createPayment = functions.https.onCall(createPaymentHandler);
