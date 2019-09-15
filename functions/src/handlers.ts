@@ -1,10 +1,11 @@
 import axios from 'axios';
 import { createHash } from 'crypto';
-import { v4 } from 'uuid';
+// import { v4 } from 'uuid';
 import endpoint from './endpoints';
 import { VtbAPI } from './vtb'
 import { PaymentView } from './PaymentView';
 import { db } from './db';
+import { pubsub } from 'firebase-functions';
 
 const deviceId = 'metadevs';
 const currencyCode = 810;
@@ -27,7 +28,7 @@ type Payer = {
 }
 
 export type PaymentModel = {
-    id: string;
+    id?: string;
     participants: Payer[];
     description: string;
     ownerAmount: number;
@@ -36,7 +37,7 @@ export type PaymentModel = {
 
 
 export type Payment = {
-    id: string;
+    id?: string;
     participants: Payer[];
     description: string;
     ownerAmount: number;
@@ -53,7 +54,38 @@ type PaymentList = {
     list: Payment[];
 };
 
+type Invoice = {
+    amount: number;
+    payer: string;
+    recipient: string;
+    /**
+     * 0 - Отменен
+     * 1 - Успешно закрыт
+     * 2 - В процессе
+     */
+    status: '0' | '1' | '2';
+};
+
 const userCollention = db.collection('users');
+const invoiceCollention = db.collection('invoices');
+
+const scheduledFunction = pubsub.schedule('every 5 minutes').onRun(async (_context) => {
+    console.log('Update invoice statuses!');
+    const invoicesInProgress = await invoiceCollention.where('status', '==', '2').limit(10).get();
+    if (!invoicesInProgress.empty) {
+        axiosConfig.headers.FPSID = await getFpsId();
+        invoicesInProgress.forEach(async invoice => {
+            const { recipient } = invoice.data();
+            const invoiceData: VtbAPI.InvoiceInfo = (await axios.get(
+                endpoint.invoceInfo(invoice.id, recipient),
+                axiosConfig
+            )).data;
+            const status = getInvoiceStatus(invoiceData.data.state);
+            await invoice.ref.update({ status });
+            await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status })
+        });
+    }
+});
 
 const getUserAddress = async (username: string): Promise<User | undefined> => {
     let response = undefined;
@@ -94,25 +126,28 @@ const createPayment = async (createPayment: string | { username: string, payment
     if (userData) {
         axiosConfig.headers.FPSID = await getFpsId();
         const userPayments = userDocument.collection('payments');
-        payment.participants = payment.participants.map((payer: Payer) => {
-            return {
-                ...payer,
-                status: '2',
-                invoiceNumber: v4()
-            }
-        });
-        payment.participants.forEach(async (payer: Payer) => {
+        payment.participants = await Promise.all(payment.participants.map(async (payer: Payer) => {
+            const invoiceRef = await invoiceCollention.add({
+                amount: payer.amount,
+                payer: payer.address,
+                recipient: userData.address,
+                status: '2'
+            } as Invoice);
             const createInvoice = {
                 currencyCode,
                 amount: payer.amount,
                 description: payment.description,
                 payer: payer.address,
                 recipient: userData.address,
-                number: payer.invoiceNumber
-            }
+                number: invoiceRef.id
+            };
             await axios.post(endpoint.invoice, createInvoice, axiosConfig);
-        });
-
+            return {
+                ...payer,
+                status: '2',
+                invoiceNumber: invoiceRef.id
+            } as Payer;
+        }));
         await userPayments.add(payment);
     }
 }
@@ -125,13 +160,16 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
         const userPayments = userDocument.collection('payments');
         const userPaymentsSnapshot = await userPayments.get();
         if (!userPaymentsSnapshot.empty) {
-            const sessionId = await getFpsId();
-            const payments: PaymentModel[] = await Promise.all(userPaymentsSnapshot.docs.map((payment) => {
-                const { participants } = payment.data();
-                participants.map((user: Payer) => updateInvoiceStatus(user, userData.address, sessionId));
-                payment.ref.update({ participants });
-                return payment.data() as PaymentModel;
-            }));
+            // const sessionId = await getFpsId();
+            const payments: PaymentModel[] = userPaymentsSnapshot.docs.map((payment) => {
+                // const { participants } = payment.data();
+                // participants.map((user: Payer) => updateInvoiceStatus(user, userData.address, sessionId));
+                // payment.ref.update({ participants });
+                return {
+                    ...payment.data() as PaymentModel,
+                    id: payment.id
+                }
+            });
             return PaymentView.renderList(payments);
         }
     }
@@ -145,21 +183,14 @@ const getFpsId = async (): Promise<string> => {
     return data;
 }
 
-const updateInvoiceStatus = async (participant: Payer, recipient: string, sessionId: string) => {
-    const axiosConfig = { headers: { FPSID: sessionId } };
-    if (participant.status === '2') {
-        const invoiceData: VtbAPI.InvoiceInfo = (await axios.get(
-            endpoint.invoceInfo(participant.invoiceNumber, recipient),
-            axiosConfig
-        )).data;
-        if (invoiceData.data.state === 5) {
-            participant.status = '1';
-        } else if (invoiceData.data.state === 1 || invoiceData.data.state === 2) {
-            participant.status = '2';
-        } else {
-            participant.status = '0';
-        }
+const getInvoiceStatus = async (state: number) => {
+    let status = '0';
+    if (state === 5) {
+        status = '1';
+    } else if (state === 1 || state === 2) {
+        status = '2';
     }
+    return status;
 }
 
-export { getUserAddress, getUserPayments, createPayment };
+export { getUserAddress, getUserPayments, createPayment, scheduledFunction };
