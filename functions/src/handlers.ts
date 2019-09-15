@@ -116,6 +116,7 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
                 const paymentDoc = payment.ref;
                 paymentDoc.update(payment);
             });
+            return PaymentView.renderList(payments);
         }
     }
     return {
