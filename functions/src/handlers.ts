@@ -76,7 +76,18 @@ const getUserAddress = async (username: string): Promise<User | undefined> => {
     return response;
 }
 
-const createPayment = async ({ username, payment }: { username: string, payment: Payment }): Promise<void> => {
+const createPayment = async (createPayment: string | { username: string, payment: Payment }): Promise<void> => {
+    console.info(createPayment);
+    let username: string;
+    let payment: Payment
+    if (createPayment instanceof Object) {
+        username = createPayment.username;
+        payment = createPayment.payment;
+    } else {
+        const parsedPayment = JSON.parse(createPayment);
+        username = parsedPayment.username;
+        payment = parsedPayment.payment;
+    }
     const userDocument = userCollention.doc(username);
     const userDocumentSnapshot = await userDocument.get();
     const userData = userDocumentSnapshot.data();
