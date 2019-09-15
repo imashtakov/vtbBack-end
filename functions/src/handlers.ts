@@ -56,6 +56,8 @@ type Invoice = {
     amount: number;
     payer: string;
     recipient: string;
+    recipientName: string;
+    paymentId: string;
     /**
      * 0 - Отменен
      * 1 - Успешно закрыт
@@ -77,7 +79,7 @@ const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_conte
     if (!invoicesInProgress.empty) {
         axiosConfig.headers.FPSID = await getFpsId();
         invoicesInProgress.forEach(async invoice => {
-            const { recipient } = invoice.data();
+            const { recipient, recipientName, paymentId } = invoice.data();
             let status = '2';
             const updateTime = Date.now();
             try {
@@ -90,7 +92,19 @@ const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_conte
                 console.error(err);
             }
             await invoice.ref.update({ status, updateTime });
-            await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status, updateTime });
+            const userPaymentRef = db.doc(`users/${recipientName}/payments/${paymentId}`);
+            const userPaymentDocument = await userPaymentRef.get();
+            const userPayment = userPaymentDocument.data() as Payment;
+            if (userPayment) {
+                const { participants } = userPayment;
+                participants.map((user: Payer) => {
+                    return {
+                        ...user,
+                        status: user.invoiceNumber === invoice.id ? status : user.status
+                    }
+                });
+                await userPaymentRef.update({ participants });
+            }
         });
     }
 });
@@ -133,12 +147,15 @@ const createPayment = async (createPayment: string | { username: string, payment
     if (userData) {
         axiosConfig.headers.FPSID = await getFpsId();
         const userPayments = userDocument.collection('payments');
+        const userPaymentRef = await userPayments.add({});
         payment.participants = await Promise.all(payment.participants.map(async (payer: Payer) => {
             const invoiceRef = await invoiceCollention.add({
                 amount: payer.amount,
                 payer: payer.address,
                 recipient: userData.address,
+                recipientName: username,
                 status: '2',
+                paymentId: userPaymentRef.id,
                 updateTime: Date.now()
             } as Invoice);
             const createInvoice = {
@@ -156,7 +173,7 @@ const createPayment = async (createPayment: string | { username: string, payment
                 invoiceNumber: invoiceRef.id
             } as Payer;
         }));
-        await userPayments.add(payment);
+        await userPaymentRef.update(payment);
     }
 }
 
