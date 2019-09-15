@@ -1,7 +1,6 @@
 import axios from 'axios';
 import { createHash } from 'crypto';
 import endpoint from './endpoints';
-import { VtbAPI } from './vtb'
 import { PaymentView } from './PaymentView';
 import { db } from './db';
 import { pubsub } from 'firebase-functions';
@@ -68,18 +67,17 @@ type Invoice = {
 const userCollention = db.collection('users');
 const invoiceCollention = db.collection('invoices');
 
-const scheduledFunction = pubsub.schedule('every 5 minutes').onRun(async (_context) => {
-    console.log('Update invoice statuses!');
-    const invoicesInProgress = await invoiceCollention.where('status', '==', '2').limit(10).get();
+const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_context) => {
+    const invoicesInProgress = await invoiceCollention.where('status', '==', '2').limit(3).get();
     if (!invoicesInProgress.empty) {
         axiosConfig.headers.FPSID = await getFpsId();
         invoicesInProgress.forEach(async invoice => {
             const { recipient } = invoice.data();
-            const invoiceData: VtbAPI.InvoiceInfo = (await axios.get(
+            const { data: { data: { state } } } = await axios.get(
                 endpoint.invoceInfo(invoice.id, recipient),
                 axiosConfig
-            )).data;
-            const status = await getInvoiceStatus(invoiceData.data.state);
+            );
+            const status = getInvoiceStatus(state);
             if (status !== '2') {
                 await invoice.ref.update({ status });
                 await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status });
@@ -179,7 +177,7 @@ const getFpsId = async (): Promise<string> => {
     return data;
 }
 
-const getInvoiceStatus = async (state: number) => {
+const getInvoiceStatus = (state: number) => {
     let status = '0';
     if (state === 5) {
         status = '1';
