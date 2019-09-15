@@ -6,6 +6,6 @@ const identifier = (identifier: string) => `${BASE_URL}/account/identifier/${ide
 
 const invoice = `${BASE_URL}/invoice`;
 
-const invoceInfo = (invoiceNumber: string, address: string) => `${BASE_URL}/invoice/810/${invoiceNumber}/${address}`;
+const invoceInfo = (invoiceNumber: string, recipient: string) => `${BASE_URL}/invoice/810/${invoiceNumber}/${recipient}`;
 
 export default { session, identifier, invoice, invoceInfo };

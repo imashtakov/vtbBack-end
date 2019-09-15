@@ -21,24 +21,30 @@
         // Initialize Firebase
         firebase.initializeApp(firebaseConfig);
 
-        // const paymentPayload = {
-        //     username: 'deziev',
-        //     payment: {
-        //         participants: [{
-        //             address: '2c80ef1c177c7308e8c9797fee1a5688c308cb6f',
-        //             amount: 2000
-        //         }, {
-        //             address: 'b92f0a8b44bca0e1025d38b1bd7aa246185e3352',
-        //             amount: 500
-        //         }],
-        //         description: '123',
-        //         ownerAmount: 5000,
-        //         overallCost: 10000
-        //     }
-        // }
+        const paymentPayload = {
+            username: 'ilja.chitneev@gmail.com',
+            payment: {
+                participants: [{
+                    address: '442e15db0d60e77edd8794e87dd537c34788f463',
+                    amount: 2000
+                }, {
+                    address: 'b92f0a8b44bca0e1025d38b1bd7aa246185e3352',
+                    amount: 500
+                }, {
+                    address: 'c974ef0d29ae404b297363dd3cf704ba911f5836',
+                    amount: 1337
+                }],
+                description: '123',
+                ownerAmount: 5000,
+                overallCost: 10000
+            }
+        }
 
-        // const addPayment = firebase.functions().httpsCallable('createPayment');
-        // addPayment(paymentPayload).then(result => console.warn(result));
+        const addMessage = firebase.functions().httpsCallable('getUserAddress');
+        addMessage('ilja.chitneev@gmail.com').then(result => console.warn(result));
+
+        const addPayment = firebase.functions().httpsCallable('createPayment');
+        addPayment(paymentPayload).then(result => console.warn(result));
 
         const addMessage = firebase.functions().httpsCallable('getUserPayments');
         addMessage('deziev').then(result => console.warn(result));
