@@ -62,13 +62,18 @@ type Invoice = {
      * 2 - В процессе
      */
     status: '0' | '1' | '2';
+    updateTime: number;
 };
 
 const userCollention = db.collection('users');
 const invoiceCollention = db.collection('invoices');
 
 const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_context) => {
-    const invoicesInProgress = await invoiceCollention.where('status', '==', '2').limit(3).get();
+    const invoicesInProgress = await invoiceCollention
+        .where('status', '==', '2')
+        .orderBy('updateTime', 'desc')
+        .limit(3)
+        .get();
     if (!invoicesInProgress.empty) {
         axiosConfig.headers.FPSID = await getFpsId();
         invoicesInProgress.forEach(async invoice => {
@@ -78,10 +83,9 @@ const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_conte
                 axiosConfig
             );
             const status = getInvoiceStatus(state);
-            if (status !== '2') {
-                await invoice.ref.update({ status });
-                await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status });
-            }
+            const updateTime = Date.now();
+            await invoice.ref.update({ status, updateTime });
+            await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status, updateTime });
         });
     }
 });
@@ -129,7 +133,8 @@ const createPayment = async (createPayment: string | { username: string, payment
                 amount: payer.amount,
                 payer: payer.address,
                 recipient: userData.address,
-                status: '2'
+                status: '2',
+                updateTime: Date.now()
             } as Invoice);
             const createInvoice = {
                 currencyCode,
