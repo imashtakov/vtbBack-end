@@ -70,20 +70,25 @@ const invoiceCollention = db.collection('invoices');
 
 const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_context) => {
     const invoicesInProgress = await invoiceCollention
-        .where('status', '==', '2')
         .orderBy('updateTime', 'asc')
+        .where('status', '==', '2')
         .limit(3)
         .get();
     if (!invoicesInProgress.empty) {
         axiosConfig.headers.FPSID = await getFpsId();
         invoicesInProgress.forEach(async invoice => {
             const { recipient } = invoice.data();
-            const { data: { data: { state } } } = await axios.get(
-                endpoint.invoceInfo(invoice.id, recipient),
-                axiosConfig
-            );
-            const status = getInvoiceStatus(state);
+            let status = '2';
             const updateTime = Date.now();
+            try {
+                const { data: { data: { state } } } = await axios.get(
+                    endpoint.invoceInfo(invoice.id, recipient),
+                    axiosConfig
+                );
+                status = getInvoiceStatus(state);
+            } catch (err) {
+                console.error(err);
+            }
             await invoice.ref.update({ status, updateTime });
             await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status, updateTime });
         });
