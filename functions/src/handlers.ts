@@ -80,9 +80,11 @@ const scheduledFunction = pubsub.schedule('every 5 minutes').onRun(async (_conte
                 endpoint.invoceInfo(invoice.id, recipient),
                 axiosConfig
             )).data;
-            const status = getInvoiceStatus(invoiceData.data.state);
-            await invoice.ref.update({ status });
-            await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status })
+            const status = await getInvoiceStatus(invoiceData.data.state);
+            if (status !== '2') {
+                await invoice.ref.update({ status });
+                await db.doc(`users/${recipient}/payments/${invoice.id}`).update({ status });
+            }
         });
     }
 });
