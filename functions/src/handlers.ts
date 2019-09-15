@@ -1,6 +1,5 @@
 import axios from 'axios';
 import { createHash } from 'crypto';
-// import { v4 } from 'uuid';
 import endpoint from './endpoints';
 import { VtbAPI } from './vtb'
 import { PaymentView } from './PaymentView';
@@ -111,7 +110,6 @@ const getUserAddress = async (username: string): Promise<User | undefined> => {
 }
 
 const createPayment = async (createPayment: string | { username: string, payment: Payment }): Promise<void> => {
-    console.info(createPayment);
     let username: string;
     let payment: Payment
     if (createPayment instanceof Object) {
@@ -162,11 +160,7 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
         const userPayments = userDocument.collection('payments');
         const userPaymentsSnapshot = await userPayments.get();
         if (!userPaymentsSnapshot.empty) {
-            // const sessionId = await getFpsId();
             const payments: PaymentModel[] = userPaymentsSnapshot.docs.map((payment) => {
-                // const { participants } = payment.data();
-                // participants.map((user: Payer) => updateInvoiceStatus(user, userData.address, sessionId));
-                // payment.ref.update({ participants });
                 return {
                     ...payment.data() as PaymentModel,
                     id: payment.id
