@@ -85,16 +85,17 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
         const userPayments = userDocument.collection('payments');
         const userPaymentsSnapshot = await userPayments.get();
         if (!userPaymentsSnapshot.empty) {
+            const userData = userDocumentSnapshot.data();
             const updateInvoiceStatus = async (participant: Payer, sessionId: string) => {
                 const axiosConfig = { headers: { FPSID: sessionId } };
                 if (participant.status === '2') {
-                    const invoiceData: VtbAPI.InvoiceInfo = await axios.get(
-                        endpoint.invoceInfo(participant.invoiceNumber, participant.address),
+                    const invoiceData: VtbAPI.InvoiceInfo = (await axios.get(
+                        endpoint.invoceInfo(participant.invoiceNumber, userData!.address),
                         axiosConfig
-                    );
-                    if (invoiceData.state === 5) {
+                    )).data;
+                    if (invoiceData.data.state === 5) {
                         participant.status = '1';
-                    } else if (invoiceData.state === 1 || invoiceData.state === 2) {
+                    } else if (invoiceData.data.state === 1 || invoiceData.data.state === 2) {
                         participant.status = '2';
                     } else {
                         participant.status = '0';
@@ -111,7 +112,10 @@ const getUserPayments = async (username: string): Promise<PaymentList | undefine
                     user => updateInvoiceStatus(user, sessionId)
                 ));
             }
-            return PaymentView.renderList(payments);
+            userPaymentsSnapshot.docs.forEach((payment) => {
+                const paymentDoc = payment.ref;
+                paymentDoc.update(payment);
+            });
         }
     }
     return {
