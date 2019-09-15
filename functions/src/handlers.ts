@@ -71,7 +71,7 @@ const invoiceCollention = db.collection('invoices');
 const scheduledFunction = pubsub.schedule('every 1 minutes').onRun(async (_context) => {
     const invoicesInProgress = await invoiceCollention
         .where('status', '==', '2')
-        .orderBy('updateTime', 'desc')
+        .orderBy('updateTime', 'asc')
         .limit(3)
         .get();
     if (!invoicesInProgress.empty) {
